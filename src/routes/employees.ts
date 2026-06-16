@@ -1,8 +1,8 @@
 import { Elysia, t } from 'elysia'
 import { authMiddleware } from '../middleware/auth'
 import { db } from '../db'
-import { employees, leaveBalances } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { employees, leaveBalances, attendance, leaves } from '../db/schema'
+import { eq, ne, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
 export const employeeRoutes = new Elysia({ prefix: '/employees' })
@@ -58,17 +58,34 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
   })
   .put('/:id', async ({ params, body, user, set }) => {
     if (user.role !== 'admin' && user.id !== Number(params.id)) { set.status = 403; return { error: 'Forbidden' } }
-    const { name, department, designation, phone, avatar } = body
-    const [updated] = await db.update(employees)
-      .set({ name, department, designation, phone, avatar, updatedAt: new Date() })
+    const { name, email, employeeCode, department, designation, phone, role, joinDate, isActive, avatar, password } = body
+    const changes: Record<string, any> = { updatedAt: new Date() }
+    if (name !== undefined)        changes.name = name
+    if (department !== undefined)  changes.department = department
+    if (designation !== undefined) changes.designation = designation
+    if (phone !== undefined)       changes.phone = phone
+    if (avatar !== undefined)      changes.avatar = avatar
+    if (user.role === 'admin') {
+      if (email !== undefined)       changes.email = email
+      if (employeeCode !== undefined) changes.employeeCode = employeeCode
+      if (role !== undefined)        changes.role = role
+      if (joinDate !== undefined)    changes.joinDate = joinDate
+      if (isActive !== undefined)    changes.isActive = isActive
+      if (password)                  changes.password = await bcrypt.hash(password, 10)
+    }
+    const [updated] = await db.update(employees).set(changes)
       .where(eq(employees.id, Number(params.id))).returning()
-    return updated
+    const { password: _, ...safe } = updated
+    return safe
   }, {
     params: t.Object({ id: t.String() }),
     body: t.Object({
-      name: t.Optional(t.String()), department: t.Optional(t.String()),
+      name: t.Optional(t.String()), email: t.Optional(t.String()),
+      employeeCode: t.Optional(t.String()), department: t.Optional(t.String()),
       designation: t.Optional(t.String()), phone: t.Optional(t.String()),
-      avatar: t.Optional(t.String()),
+      role: t.Optional(t.String()), joinDate: t.Optional(t.String()),
+      isActive: t.Optional(t.Boolean()), avatar: t.Optional(t.String()),
+      password: t.Optional(t.String()),
     }),
   })
   .patch('/:id/toggle', async ({ params, user, set }) => {
@@ -80,3 +97,14 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       .where(eq(employees.id, Number(params.id))).returning()
     return { isActive: updated.isActive }
   }, { params: t.Object({ id: t.String() }) })
+  .delete('/reset-all', async ({ user, set }) => {
+    if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
+    await db.delete(attendance)
+    await db.delete(leaves)
+    await db.delete(leaveBalances)
+    await db.delete(employees).where(ne(employees.id, user.id))
+    await db.execute(sql`SELECT setval('attendance_id_seq', 1, false)`)
+    await db.execute(sql`SELECT setval('leaves_id_seq', 1, false)`)
+    await db.execute(sql`SELECT setval('leave_balances_id_seq', 1, false)`)
+    return { success: true }
+  })

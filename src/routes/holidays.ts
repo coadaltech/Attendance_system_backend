@@ -13,7 +13,7 @@ export const holidayRoutes = new Elysia({ prefix: '/holidays' })
       gte(holidays.date, `${year}-01-01`),
       lte(holidays.date, `${year}-12-31`),
     ]
-    if (user.role !== 'admin') filters.push(eq(holidays.isApproved, true))
+    // all roles see all holidays
     return await db.select().from(holidays).where(and(...filters))
   }, { query: t.Object({ year: t.Optional(t.String()) }) })
 
