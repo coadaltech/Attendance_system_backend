@@ -1,0 +1,28 @@
+{
+  "name": "coadal-attendance-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "bun run src/db/seed.ts",
+    "db:reset": "bun run src/db/reset.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.2.25",
+    "@elysiajs/jwt": "^1.2.2",
+    "@elysiajs/cors": "^1.2.2",
+    "@elysiajs/bearer": "^1.2.2",
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.5",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "bun-types": "^1.2.0",
+    "drizzle-kit": "^0.30.1",
+    "@types/bcryptjs": "^2.4.6"
+  }
+}
