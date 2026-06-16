@@ -10,14 +10,11 @@ import { holidayRoutes } from './routes/holidays'
 
 const app = new Elysia()
   .use(cors({
-    origin: (req) => {
-      const allowed = [
-        'http://localhost:5173',
-        'http://localhost:4173',
-        process.env.FRONTEND_URL,
-      ].filter(Boolean)
-      return allowed.includes(req) ? req : false
-    },
+    origin: ([
+      'http://localhost:5173',
+      'http://localhost:4173',
+      process.env.FRONTEND_URL,
+    ] as (string | undefined)[]).filter((x): x is string => Boolean(x)),
     credentials: true,
   }))
   // JWT and bearer must be at the root so derive({ as:'global' }) can see them
