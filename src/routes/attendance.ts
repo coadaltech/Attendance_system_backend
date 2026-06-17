@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { authMiddleware } from '../middleware/auth'
 import { db } from '../db'
 import { attendance, holidays } from '../db/schema'
-import { eq, and, gte, lte, desc } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, lt, isNull, isNotNull } from 'drizzle-orm'
 
 function calcWorkingHours(punchIn: Date, punchOut: Date): number {
   return Number(((punchOut.getTime() - punchIn.getTime()) / 3600000).toFixed(2))
@@ -36,6 +36,29 @@ function getOfficeConfig() {
   }
 }
 
+// Closes all attendance records where employee punched in but never punched out
+// before 'beforeDate'. Called on every punch-in and from the nightly scheduler.
+export async function closeUnclosedAttendance(beforeDate: string, employeeId?: number) {
+  const filters = [
+    lt(attendance.date, beforeDate),
+    isNotNull(attendance.punchIn),
+    isNull(attendance.punchOut),
+  ]
+  if (employeeId !== undefined) filters.push(eq(attendance.employeeId, employeeId))
+
+  const open = await db.select().from(attendance).where(and(...filters))
+  for (const rec of open) {
+    await db.update(attendance)
+      .set({
+        status: 'half_day',
+        workingHours: '4',
+        notes: 'Auto-marked half day: punch out missing',
+        updatedAt: new Date(),
+      })
+      .where(eq(attendance.id, rec.id))
+  }
+}
+
 export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
   .use(authMiddleware)
   // Returns office geofence config so the frontend can show distance info
@@ -57,7 +80,7 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     const allEmps = await db.select({
       id: employees.id, name: employees.name, department: employees.department,
       designation: employees.designation, employeeCode: employees.employeeCode,
-    }).from(employees).where(eq(employees.isActive, true))
+    }).from(employees).where(and(eq(employees.isActive, true), eq(employees.role, 'employee')))
 
     const todayRecords = await db.select().from(attendance).where(eq(attendance.date, today))
     const attMap: Record<number, any> = Object.fromEntries(todayRecords.map(r => [r.employeeId, r]))
@@ -83,6 +106,10 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     }
 
     const today = new Date().toISOString().split('T')[0]
+
+    // Auto-close any previous days where this employee forgot to punch out
+    await closeUnclosedAttendance(today, user.id)
+
     const [existing] = await db.select().from(attendance)
       .where(and(eq(attendance.employeeId, user.id), eq(attendance.date, today)))
 

@@ -3,7 +3,7 @@ import { cors } from '@elysiajs/cors'
 import { jwt } from '@elysiajs/jwt'
 import { bearer } from '@elysiajs/bearer'
 import { authRoutes } from './routes/auth'
-import { attendanceRoutes } from './routes/attendance'
+import { attendanceRoutes, closeUnclosedAttendance } from './routes/attendance'
 import { leaveRoutes } from './routes/leave'
 import { employeeRoutes } from './routes/employees'
 import { holidayRoutes } from './routes/holidays'
@@ -52,3 +52,21 @@ const app = new Elysia()
   .listen(process.env.PORT || 3000)
 
 console.log(`Coadal Attendance API running at http://localhost:${app.server?.port}`)
+
+// Nightly job: at 11:30 PM close all open attendance records from today
+function scheduleNightlyClose() {
+  const now = new Date()
+  const next = new Date()
+  next.setHours(23, 30, 0, 0)
+  if (now >= next) next.setDate(next.getDate() + 1)
+  const delay = next.getTime() - now.getTime()
+
+  setTimeout(async () => {
+    const today = new Date().toISOString().split('T')[0]
+    console.log(`[Nightly] Closing unclosed attendance for ${today}`)
+    await closeUnclosedAttendance(today)
+    scheduleNightlyClose()
+  }, delay)
+}
+
+scheduleNightlyClose()
