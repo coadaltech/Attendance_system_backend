@@ -80,6 +80,7 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     const allEmps = await db.select({
       id: employees.id, name: employees.name, department: employees.department,
       designation: employees.designation, employeeCode: employees.employeeCode,
+      createdAt: employees.createdAt,
     }).from(employees).where(and(eq(employees.isActive, true), eq(employees.role, 'employee')))
 
     const todayRecords = await db.select().from(attendance).where(eq(attendance.date, today))
@@ -207,13 +208,27 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     const lastDay = new Date(y, m, 0).getDate()
     const endDate = `${y}-${String(m).padStart(2, '0')}-${lastDay}`
 
+    // Look up employee's createdAt to use as tracking start
+    const { employees: empTable } = await import('../db/schema')
+    const [emp] = await db.select({ createdAt: empTable.createdAt })
+      .from(empTable).where(eq(empTable.id, user.id))
+    const trackingStart = (() => {
+      const monthStart = new Date(y, m - 1, 1)
+      if (emp?.createdAt) {
+        const d = new Date(emp.createdAt); d.setHours(0, 0, 0, 0)
+        return d > monthStart ? d : monthStart
+      }
+      return monthStart
+    })()
+
     const records = await db.select().from(attendance)
       .where(and(eq(attendance.employeeId, user.id), gte(attendance.date, startDate), lte(attendance.date, endDate)))
 
     const holidayList = await db.select().from(holidays)
       .where(and(gte(holidays.date, startDate), lte(holidays.date, endDate)))
+    const holidaySet = new Set(holidayList.map(h => h.date))
 
-    const totalWorkingDays = lastDay - holidayList.length - countWeekends(y, m)
+    const totalWorkingDays = countWorkingDays(y, m, trackingStart, holidaySet)
     const presentDays = records.filter(r => ['full_day', 'overtime'].includes(r.status)).length
     const halfDays = records.filter(r => r.status === 'half_day').length
     const totalHours = records.reduce((sum, r) => sum + Number(r.workingHours || 0), 0)
@@ -229,12 +244,18 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     }
   }, { query: t.Object({ month: t.Optional(t.String()), year: t.Optional(t.String()) }) })
 
-function countWeekends(year: number, month: number): number {
+// Count working days (Mon–Sat) from trackingStart up to today, excluding holidays
+function countWorkingDays(year: number, month: number, trackingStart: Date, holidaySet: Set<string>): number {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
   const lastDay = new Date(year, month, 0).getDate()
   let count = 0
   for (let d = 1; d <= lastDay; d++) {
-    const day = new Date(year, month - 1, d).getDay()
-    if (day === 0 || day === 6) count++
+    const dayDate = new Date(year, month - 1, d)
+    if (dayDate < trackingStart || dayDate > today) continue
+    const dow = dayDate.getDay()
+    if (dow === 0) continue // Sunday only
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+    if (!holidaySet.has(dateStr)) count++
   }
   return count
 }
