@@ -14,6 +14,7 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       employeeCode: employees.employeeCode, department: employees.department,
       designation: employees.designation, phone: employees.phone, role: employees.role,
       joinDate: employees.joinDate, isActive: employees.isActive, avatar: employees.avatar,
+      createdAt: employees.createdAt,
     }).from(employees)
   })
   .get('/me', async ({ user }) => {
