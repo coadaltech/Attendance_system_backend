@@ -200,6 +200,67 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     params: t.Object({ id: t.String() }),
     query: t.Object({ month: t.Optional(t.String()), year: t.Optional(t.String()) }),
   })
+  // Admin: create or update attendance for any employee on any date
+  .post('/admin-mark', async ({ user, body, set }) => {
+    if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
+    const { employeeId, date, punchIn, punchOut, status, notes } = body
+
+    // Build timestamps from date + time strings
+    const makeTs = (dateStr: string, timeStr: string) => {
+      const [h, m] = timeStr.split(':').map(Number)
+      const d = new Date(dateStr)
+      d.setHours(h, m, 0, 0)
+      return d
+    }
+
+    const punchInTs  = punchIn  ? makeTs(date, punchIn)  : null
+    const punchOutTs = punchOut ? makeTs(date, punchOut) : null
+
+    let hours: number | null = null
+    let computedStatus = status as string
+    if (punchInTs && punchOutTs) {
+      hours = Number(((punchOutTs.getTime() - punchInTs.getTime()) / 3600000).toFixed(2))
+      if (!computedStatus) computedStatus = determineStatus(hours)
+    } else if (punchInTs && !punchOutTs && !computedStatus) {
+      computedStatus = 'full_day'
+    }
+
+    const [existing] = await db.select().from(attendance)
+      .where(and(eq(attendance.employeeId, employeeId), eq(attendance.date, date)))
+
+    const now = new Date()
+    if (existing) {
+      const [updated] = await db.update(attendance).set({
+        punchIn: punchInTs ?? existing.punchIn,
+        punchOut: punchOutTs ?? existing.punchOut,
+        workingHours: hours !== null ? String(hours) : existing.workingHours,
+        status: (computedStatus ?? existing.status) as any,
+        notes: notes ?? existing.notes,
+        updatedAt: now,
+      }).where(eq(attendance.id, existing.id)).returning()
+      return updated
+    }
+
+    const [created] = await db.insert(attendance).values({
+      employeeId,
+      date,
+      punchIn: punchInTs ?? undefined,
+      punchOut: punchOutTs ?? undefined,
+      workingHours: hours !== null ? String(hours) : undefined,
+      status: (computedStatus || 'absent') as any,
+      notes: notes ?? undefined,
+    }).returning()
+    return created
+  }, {
+    body: t.Object({
+      employeeId: t.Number(),
+      date: t.String(),
+      punchIn: t.Optional(t.String()),
+      punchOut: t.Optional(t.String()),
+      status: t.Optional(t.String()),
+      notes: t.Optional(t.String()),
+    }),
+  })
   .get('/summary', async ({ user, query }) => {
     const { month, year } = query
     const y = Number(year) || new Date().getFullYear()
