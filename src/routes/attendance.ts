@@ -237,13 +237,17 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     const punchInTs  = punchIn  ? makeTs(date, punchIn)  : null
     const punchOutTs = punchOut ? makeTs(date, punchOut) : null
 
+    // Auto-calculate hours and status from punch times
     let hours: number | null = null
-    let computedStatus = status as string
+    let computedStatus = status || null  // null = auto mode
+
     if (punchInTs && punchOutTs) {
       hours = Number(((punchOutTs.getTime() - punchInTs.getTime()) / 3600000).toFixed(2))
       if (!computedStatus) computedStatus = determineStatus(hours)
-    } else if (punchInTs && !punchOutTs && !computedStatus) {
-      computedStatus = 'full_day'
+    } else if (punchInTs && !punchOutTs) {
+      if (!computedStatus) computedStatus = 'full_day'
+    } else if (!punchInTs && !punchOutTs) {
+      if (!computedStatus) computedStatus = 'absent'
     }
 
     const [existing] = await db.select().from(attendance)
@@ -251,11 +255,12 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
 
     const now = new Date()
     if (existing) {
+      // Save exactly what admin sent — no silent fallback to old values
       const [updated] = await db.update(attendance).set({
-        punchIn: punchInTs ?? existing.punchIn,
-        punchOut: punchOutTs ?? existing.punchOut,
-        workingHours: hours !== null ? String(hours) : existing.workingHours,
-        status: (computedStatus ?? existing.status) as any,
+        punchIn: punchInTs,
+        punchOut: punchOutTs,
+        workingHours: hours !== null ? String(hours) : null,
+        status: computedStatus as any,
         notes: notes ?? existing.notes,
         updatedAt: now,
       }).where(eq(attendance.id, existing.id)).returning()
