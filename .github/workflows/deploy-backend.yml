@@ -19,7 +19,7 @@ jobs:
           script: |
             set -e
 
-            cd ~/attendance
+            cd ~/attendance_backend
 
             echo "Pulling latest code..."
             git pull origin main
