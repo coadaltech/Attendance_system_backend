@@ -200,6 +200,27 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     params: t.Object({ id: t.String() }),
     query: t.Object({ month: t.Optional(t.String()), year: t.Optional(t.String()) }),
   })
+  // Admin: export all employees' attendance for a month as JSON (frontend builds CSV)
+  .get('/export-all', async ({ user, query, set }) => {
+    if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
+    const y = Number(query.year)  || new Date().getFullYear()
+    const m = Number(query.month) || new Date().getMonth() + 1
+    const startDate = `${y}-${String(m).padStart(2, '0')}-01`
+    const lastDay   = new Date(y, m, 0).getDate()
+    const endDate   = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+    const { employees: empTable } = await import('../db/schema')
+    const allEmps = await db.select({
+      id: empTable.id, name: empTable.name,
+      employeeCode: empTable.employeeCode, department: empTable.department,
+    }).from(empTable).where(and(eq(empTable.isActive, true), eq(empTable.role, 'employee')))
+
+    const allRecords = await db.select().from(attendance)
+      .where(and(gte(attendance.date, startDate), lte(attendance.date, endDate)))
+
+    return { employees: allEmps, records: allRecords, month: m, year: y }
+  }, { query: t.Object({ month: t.Optional(t.String()), year: t.Optional(t.String()) }) })
+
   // Admin: create or update attendance for any employee on any date
   .post('/admin-mark', async ({ user, body, set }) => {
     if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
