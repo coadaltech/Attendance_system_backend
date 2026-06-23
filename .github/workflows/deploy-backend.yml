@@ -25,10 +25,10 @@ jobs:
             git pull origin main
 
             echo "Installing dependencies..."
-            bun install --frozen-lockfile
+            /home/ubuntu/.bun/bin/bun install --frozen-lockfile
 
             echo "Running DB migrations..."
-            bun run db:push
+            /home/ubuntu/.bun/bin/bun run db:push
 
             echo "Restarting service..."
             sudo systemctl restart attendance-backend
