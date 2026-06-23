@@ -100,24 +100,34 @@ export const leaveRoutes = new Elysia({ prefix: '/leave' })
       }).where(eq(leaveBalances.id, balance.id))
     }
 
+    // Collect all working days in the leave range
     const start = new Date(leave.startDate)
     const end = new Date(leave.endDate)
+    const leaveDates: string[] = []
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0]
-      const dayOfWeek = d.getDay()
-      if (dayOfWeek === 0 || dayOfWeek === 6) continue
+      if (d.getDay() !== 0 && d.getDay() !== 6)
+        leaveDates.push(d.toISOString().split('T')[0])
+    }
 
-      const existing = await db.select().from(attendance)
-        .where(and(eq(attendance.employeeId, leave.employeeId), eq(attendance.date, dateStr)))
-
-      if (existing.length === 0) {
-        await db.insert(attendance).values({
+    if (leaveDates.length > 0) {
+      // Single query to find already-existing records
+      const existing = await db.select({ date: attendance.date }).from(attendance)
+        .where(and(
+          eq(attendance.employeeId, leave.employeeId),
+          gte(attendance.date, leaveDates[0]),
+          lte(attendance.date, leaveDates[leaveDates.length - 1]),
+        ))
+      const existingSet = new Set(existing.map(r => r.date))
+      const toInsert = leaveDates
+        .filter(d => !existingSet.has(d))
+        .map(d => ({
           employeeId: leave.employeeId,
-          date: dateStr,
-          status: leave.leaveType === 'wfh' ? 'full_day' : 'absent',
+          date: d,
+          status: (leave.leaveType === 'wfh' ? 'full_day' : 'absent') as any,
           notes: `${leave.leaveType.toUpperCase()} leave approved`,
-        })
-      }
+        }))
+      if (toInsert.length > 0)
+        await db.insert(attendance).values(toInsert)
     }
 
     return updated

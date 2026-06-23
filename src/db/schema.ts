@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, date, time, integer, decimal, boolean, pgEnum } from 'drizzle-orm/pg-core'
+import { pgTable, serial, varchar, text, timestamp, date, time, integer, decimal, boolean, pgEnum, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
 export const roleEnum = pgEnum('role', ['admin', 'employee'])
@@ -36,7 +36,10 @@ export const attendance = pgTable('attendance', {
   punchInLng: decimal('punch_in_lng', { precision: 10, scale: 7 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => ({
+  empDateIdx: index('att_emp_date_idx').on(t.employeeId, t.date),
+  dateIdx:    index('att_date_idx').on(t.date),
+}))
 
 export const leaves = pgTable('leaves', {
   id: serial('id').primaryKey(),
@@ -51,7 +54,10 @@ export const leaves = pgTable('leaves', {
   approvedAt: timestamp('approved_at'),
   rejectionReason: text('rejection_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+}, (t) => ({
+  empIdx:    index('leaves_emp_idx').on(t.employeeId),
+  statusIdx: index('leaves_status_idx').on(t.status),
+}))
 
 export const leaveBalances = pgTable('leave_balances', {
   id: serial('id').primaryKey(),
@@ -65,7 +71,9 @@ export const leaveBalances = pgTable('leave_balances', {
   earnedUsed: integer('earned_used').default(0).notNull(),
   wfhLeave: integer('wfh_leave').default(24).notNull(),
   wfhUsed: integer('wfh_used').default(0).notNull(),
-})
+}, (t) => ({
+  empYearIdx: index('lb_emp_year_idx').on(t.employeeId, t.year),
+}))
 
 export const holidays = pgTable('holidays', {
   id: serial('id').primaryKey(),
