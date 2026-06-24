@@ -226,16 +226,9 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
     const { employeeId, date, punchIn, punchOut, status, notes } = body
 
-    // Build timestamps from date + time strings
-    const makeTs = (dateStr: string, timeStr: string) => {
-      const [h, m] = timeStr.split(':').map(Number)
-      const d = new Date(dateStr)
-      d.setHours(h, m, 0, 0)
-      return d
-    }
-
-    const punchInTs  = punchIn  ? makeTs(date, punchIn)  : null
-    const punchOutTs = punchOut ? makeTs(date, punchOut) : null
+    // Frontend sends UTC ISO strings — parse directly, no server-timezone math
+    const punchInTs  = punchIn  ? new Date(punchIn)  : null
+    const punchOutTs = punchOut ? new Date(punchOut) : null
 
     // Auto-calculate hours and status from punch times
     let hours: number | null = null
