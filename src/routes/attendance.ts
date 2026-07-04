@@ -182,12 +182,16 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     if (user.role !== 'admin' && user.id !== Number(params.id)) {
       set.status = 403; return { error: 'Forbidden' }
     }
-    const { month, year } = query
-    const y = Number(year) || new Date().getFullYear()
-    const m = Number(month) || new Date().getMonth() + 1
-    const startDate = `${y}-${String(m).padStart(2, '0')}-01`
-    const lastDay = new Date(y, m, 0).getDate()
-    const endDate = `${y}-${String(m).padStart(2, '0')}-${lastDay}`
+    let startDate: string, endDate: string
+    if (query.startDate && query.endDate) {
+      startDate = query.startDate; endDate = query.endDate
+    } else {
+      const y = Number(query.year) || new Date().getFullYear()
+      const m = Number(query.month) || new Date().getMonth() + 1
+      startDate = `${y}-${String(m).padStart(2, '0')}-01`
+      const lastDay = new Date(y, m, 0).getDate()
+      endDate = `${y}-${String(m).padStart(2, '0')}-${lastDay}`
+    }
 
     const records = await db.select().from(attendance)
       .where(and(
@@ -198,16 +202,24 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     return records
   }, {
     params: t.Object({ id: t.String() }),
-    query: t.Object({ month: t.Optional(t.String()), year: t.Optional(t.String()) }),
+    query: t.Object({
+      month: t.Optional(t.String()), year: t.Optional(t.String()),
+      startDate: t.Optional(t.String()), endDate: t.Optional(t.String()),
+    }),
   })
-  // Admin: export all employees' attendance for a month as JSON (frontend builds CSV)
+  // Admin: export all employees' attendance for a date range as JSON (frontend builds CSV)
   .get('/export-all', async ({ user, query, set }) => {
     if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
-    const y = Number(query.year)  || new Date().getFullYear()
-    const m = Number(query.month) || new Date().getMonth() + 1
-    const startDate = `${y}-${String(m).padStart(2, '0')}-01`
-    const lastDay   = new Date(y, m, 0).getDate()
-    const endDate   = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    let startDate: string, endDate: string
+    if (query.startDate && query.endDate) {
+      startDate = query.startDate; endDate = query.endDate
+    } else {
+      const y = Number(query.year)  || new Date().getFullYear()
+      const m = Number(query.month) || new Date().getMonth() + 1
+      startDate = `${y}-${String(m).padStart(2, '0')}-01`
+      const lastDay = new Date(y, m, 0).getDate()
+      endDate   = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    }
 
     const { employees: empTable } = await import('../db/schema')
     const allEmps = await db.select({
@@ -218,8 +230,13 @@ export const attendanceRoutes = new Elysia({ prefix: '/attendance' })
     const allRecords = await db.select().from(attendance)
       .where(and(gte(attendance.date, startDate), lte(attendance.date, endDate)))
 
-    return { employees: allEmps, records: allRecords, month: m, year: y }
-  }, { query: t.Object({ month: t.Optional(t.String()), year: t.Optional(t.String()) }) })
+    return { employees: allEmps, records: allRecords, startDate, endDate }
+  }, {
+    query: t.Object({
+      month: t.Optional(t.String()), year: t.Optional(t.String()),
+      startDate: t.Optional(t.String()), endDate: t.Optional(t.String()),
+    }),
+  })
 
   // Admin: create or update attendance for any employee on any date
   .post('/admin-mark', async ({ user, body, set }) => {
