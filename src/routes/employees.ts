@@ -98,6 +98,24 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
       .where(eq(employees.id, Number(params.id))).returning()
     return { isActive: updated.isActive }
   }, { params: t.Object({ id: t.String() }) })
+  .delete('/:id', async ({ params, user, set }) => {
+    if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
+    const id = Number(params.id)
+    if (id === user.id) { set.status = 400; return { error: 'Cannot delete your own account' } }
+    const [emp] = await db.select().from(employees).where(eq(employees.id, id))
+    if (!emp) { set.status = 404; return { error: 'Employee not found' } }
+    if (emp.isActive) { set.status = 400; return { error: 'Deactivate the employee before deleting' } }
+
+    await db.transaction(async (tx) => {
+      await tx.update(leaves).set({ approvedBy: null }).where(eq(leaves.approvedBy, id))
+      await tx.delete(leaves).where(eq(leaves.employeeId, id))
+      await tx.delete(leaveBalances).where(eq(leaveBalances.employeeId, id))
+      await tx.delete(attendance).where(eq(attendance.employeeId, id))
+      await tx.delete(employees).where(eq(employees.id, id))
+    })
+
+    return { success: true }
+  }, { params: t.Object({ id: t.String() }) })
   .delete('/reset-all', async ({ user, set }) => {
     if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
     await db.delete(attendance)
