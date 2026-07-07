@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia'
 import { authMiddleware } from '../middleware/auth'
 import { db } from '../db'
-import { employees, leaveBalances, attendance, leaves } from '../db/schema'
+import { employees, leaveBalances, attendance, leaves, announcements } from '../db/schema'
 import { eq, ne, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
@@ -108,6 +108,7 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
 
     await db.transaction(async (tx) => {
       await tx.update(leaves).set({ approvedBy: null }).where(eq(leaves.approvedBy, id))
+      await tx.update(announcements).set({ createdBy: null }).where(eq(announcements.createdBy, id))
       await tx.delete(leaves).where(eq(leaves.employeeId, id))
       await tx.delete(leaveBalances).where(eq(leaveBalances.employeeId, id))
       await tx.delete(attendance).where(eq(attendance.employeeId, id))

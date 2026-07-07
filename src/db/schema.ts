@@ -84,6 +84,19 @@ export const holidays = pgTable('holidays', {
   isApproved: boolean('is_approved').default(false).notNull(),
 })
 
+export const announcements = pgTable('announcements', {
+  id: serial('id').primaryKey(),
+  title: varchar('title', { length: 150 }).notNull(),
+  message: text('message').notNull(),
+  createdBy: integer('created_by').references(() => employees.id),
+  createdByName: varchar('created_by_name', { length: 100 }).notNull(),
+  durationDays: integer('duration_days').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  expiresIdx: index('announcements_expires_idx').on(t.expiresAt),
+}))
+
 export const employeesRelations = relations(employees, ({ many }) => ({
   attendance: many(attendance),
   leaves: many(leaves),
@@ -107,3 +120,4 @@ export type Leave = typeof leaves.$inferSelect
 export type NewLeave = typeof leaves.$inferInsert
 export type LeaveBalance = typeof leaveBalances.$inferSelect
 export type Holiday = typeof holidays.$inferSelect
+export type Announcement = typeof announcements.$inferSelect

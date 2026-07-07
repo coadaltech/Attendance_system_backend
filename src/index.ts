@@ -7,6 +7,7 @@ import { attendanceRoutes, closeUnclosedAttendance } from './routes/attendance'
 import { leaveRoutes } from './routes/leave'
 import { employeeRoutes } from './routes/employees'
 import { holidayRoutes } from './routes/holidays'
+import { announcementRoutes } from './routes/announcements'
 
 const app = new Elysia()
   .use(cors({
@@ -48,6 +49,7 @@ const app = new Elysia()
     .use(leaveRoutes)
     .use(employeeRoutes)
     .use(holidayRoutes)
+    .use(announcementRoutes)
   )
   .listen(process.env.PORT || 3000)
 
