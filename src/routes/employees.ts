@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia'
 import { authMiddleware } from '../middleware/auth'
 import { db } from '../db'
-import { employees, leaveBalances, attendance, leaves, announcements } from '../db/schema'
+import { employees, leaveBalances, attendance, leaves, announcements, pushSubscriptions } from '../db/schema'
 import { eq, ne, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
@@ -109,6 +109,7 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
     await db.transaction(async (tx) => {
       await tx.update(leaves).set({ approvedBy: null }).where(eq(leaves.approvedBy, id))
       await tx.update(announcements).set({ createdBy: null }).where(eq(announcements.createdBy, id))
+      await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.employeeId, id))
       await tx.delete(leaves).where(eq(leaves.employeeId, id))
       await tx.delete(leaveBalances).where(eq(leaveBalances.employeeId, id))
       await tx.delete(attendance).where(eq(attendance.employeeId, id))
@@ -119,12 +120,17 @@ export const employeeRoutes = new Elysia({ prefix: '/employees' })
   }, { params: t.Object({ id: t.String() }) })
   .delete('/reset-all', async ({ user, set }) => {
     if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
-    await db.delete(attendance)
-    await db.delete(leaves)
-    await db.delete(leaveBalances)
-    await db.delete(employees).where(ne(employees.id, user.id))
-    await db.execute(sql`SELECT setval('attendance_id_seq', 1, false)`)
-    await db.execute(sql`SELECT setval('leaves_id_seq', 1, false)`)
-    await db.execute(sql`SELECT setval('leave_balances_id_seq', 1, false)`)
+    await db.transaction(async (tx) => {
+      await tx.delete(pushSubscriptions)
+      await tx.delete(announcements)
+      await tx.delete(attendance)
+      await tx.delete(leaves)
+      await tx.delete(leaveBalances)
+      await tx.delete(employees).where(ne(employees.id, user.id))
+      await tx.execute(sql`SELECT setval('attendance_id_seq', 1, false)`)
+      await tx.execute(sql`SELECT setval('leaves_id_seq', 1, false)`)
+      await tx.execute(sql`SELECT setval('leave_balances_id_seq', 1, false)`)
+      await tx.execute(sql`SELECT setval('announcements_id_seq', 1, false)`)
+    })
     return { success: true }
   })

@@ -23,6 +23,7 @@ export const leaveRoutes = new Elysia({ prefix: '/leave' })
     const { leaveType, startDate, endDate, reason } = body
     const start = new Date(startDate)
     const end = new Date(endDate)
+    if (end < start) { set.status = 400; return { error: 'End date must be on or after start date' } }
     const totalDays = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1
 
     const year = start.getFullYear()
@@ -123,7 +124,7 @@ export const leaveRoutes = new Elysia({ prefix: '/leave' })
         .map(d => ({
           employeeId: leave.employeeId,
           date: d,
-          status: (leave.leaveType === 'wfh' ? 'full_day' : 'absent') as any,
+          status: (leave.leaveType === 'wfh' ? 'full_day' : 'on_leave') as any,
           notes: `${leave.leaveType.toUpperCase()} leave approved`,
         }))
       if (toInsert.length > 0)
@@ -134,6 +135,10 @@ export const leaveRoutes = new Elysia({ prefix: '/leave' })
   }, { params: t.Object({ id: t.String() }) })
   .patch('/:id/reject', async ({ user, params, body, set }) => {
     if (user.role !== 'admin') { set.status = 403; return { error: 'Forbidden' } }
+    const [leave] = await db.select().from(leaves).where(eq(leaves.id, Number(params.id)))
+    if (!leave) { set.status = 404; return { error: 'Leave not found' } }
+    if (leave.status !== 'pending') { set.status = 400; return { error: 'Leave already processed' } }
+
     const [updated] = await db.update(leaves).set({
       status: 'rejected',
       approvedBy: user.id,

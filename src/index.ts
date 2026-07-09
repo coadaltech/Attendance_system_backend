@@ -8,6 +8,7 @@ import { leaveRoutes } from './routes/leave'
 import { employeeRoutes } from './routes/employees'
 import { holidayRoutes } from './routes/holidays'
 import { announcementRoutes } from './routes/announcements'
+import { pushRoutes, sendPunchInReminder } from './routes/push'
 
 const app = new Elysia()
   .use(cors({
@@ -50,6 +51,7 @@ const app = new Elysia()
     .use(employeeRoutes)
     .use(holidayRoutes)
     .use(announcementRoutes)
+    .use(pushRoutes)
   )
   .listen(process.env.PORT || 3000)
 
@@ -71,4 +73,22 @@ function scheduleNightlyClose() {
   }, delay)
 }
 
+// Punch-in reminder: at 10:00 AM every day except Sunday, push-notify all active employees
+function schedulePunchInReminder() {
+  const now = new Date()
+  const next = new Date()
+  next.setHours(10, 0, 0, 0)
+  if (now >= next) next.setDate(next.getDate() + 1)
+  const delay = next.getTime() - now.getTime()
+
+  setTimeout(async () => {
+    if (next.getDay() !== 0) {
+      console.log(`[PunchIn Reminder] Sending for ${next.toISOString().split('T')[0]}`)
+      await sendPunchInReminder()
+    }
+    schedulePunchInReminder()
+  }, delay)
+}
+
 scheduleNightlyClose()
+schedulePunchInReminder()

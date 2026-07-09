@@ -2,7 +2,7 @@ import { pgTable, serial, varchar, text, timestamp, date, time, integer, decimal
 import { relations } from 'drizzle-orm'
 
 export const roleEnum = pgEnum('role', ['admin', 'employee'])
-export const attendanceStatusEnum = pgEnum('attendance_status', ['full_day', 'half_day', 'overtime', 'absent', 'holiday', 'weekend'])
+export const attendanceStatusEnum = pgEnum('attendance_status', ['full_day', 'half_day', 'overtime', 'absent', 'holiday', 'weekend', 'on_leave'])
 export const leaveTypeEnum = pgEnum('leave_type', ['sick', 'casual', 'earned', 'wfh'])
 export const leaveStatusEnum = pgEnum('leave_status', ['pending', 'approved', 'rejected'])
 
@@ -97,6 +97,17 @@ export const announcements = pgTable('announcements', {
   expiresIdx: index('announcements_expires_idx').on(t.expiresAt),
 }))
 
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: serial('id').primaryKey(),
+  employeeId: integer('employee_id').references(() => employees.id).notNull(),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  empIdx: index('push_subs_emp_idx').on(t.employeeId),
+}))
+
 export const employeesRelations = relations(employees, ({ many }) => ({
   attendance: many(attendance),
   leaves: many(leaves),
@@ -121,3 +132,4 @@ export type NewLeave = typeof leaves.$inferInsert
 export type LeaveBalance = typeof leaveBalances.$inferSelect
 export type Holiday = typeof holidays.$inferSelect
 export type Announcement = typeof announcements.$inferSelect
+export type PushSubscription = typeof pushSubscriptions.$inferSelect

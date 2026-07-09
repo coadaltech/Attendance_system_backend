@@ -44,17 +44,18 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
   }, {
     body: t.Object({ email: t.String(), password: t.String() }),
   })
-  .post('/change-password', async ({ body, set }) => {
-    const { employeeId, oldPassword, newPassword } = body
-    const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId))
+  .post('/change-password', async ({ body, user, set }) => {
+    if (!user) { set.status = 401; return { error: 'Unauthorized' } }
+    const { oldPassword, newPassword } = body
+    const [employee] = await db.select().from(employees).where(eq(employees.id, user.id))
     if (!employee) { set.status = 404; return { error: 'Employee not found' } }
 
     const valid = await bcrypt.compare(oldPassword, employee.password)
     if (!valid) { set.status = 400; return { error: 'Old password is incorrect' } }
 
     const hashed = await bcrypt.hash(newPassword, 10)
-    await db.update(employees).set({ password: hashed, updatedAt: new Date() }).where(eq(employees.id, employeeId))
+    await db.update(employees).set({ password: hashed, updatedAt: new Date() }).where(eq(employees.id, user.id))
     return { message: 'Password changed successfully' }
   }, {
-    body: t.Object({ employeeId: t.Number(), oldPassword: t.String(), newPassword: t.String() }),
+    body: t.Object({ oldPassword: t.String(), newPassword: t.String() }),
   })
