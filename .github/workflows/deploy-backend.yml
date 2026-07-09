@@ -28,7 +28,7 @@ jobs:
             /home/ubuntu/.bun/bin/bun install
 
             echo "Running DB migrations..."
-            /home/ubuntu/.bun/bin/bun run db:push
+            /home/ubuntu/.bun/bin/bun run db:migrate
 
             echo "Restarting service..."
             sudo systemctl restart attendance-backend
