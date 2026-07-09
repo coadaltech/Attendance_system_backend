@@ -9,6 +9,7 @@ const client = postgres(connectionString, {
   idle_timeout: 20, // release idle connections after 20s
   connect_timeout: 10,
 })
+
 export const db = drizzle(client, { schema })
 
 // Neon free tier sleeps after 5 min — ping every 4 min to keep it warm
