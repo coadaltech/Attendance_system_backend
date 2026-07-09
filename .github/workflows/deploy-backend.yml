@@ -25,7 +25,7 @@ jobs:
             git pull origin main
 
             echo "Installing dependencies..."
-            /home/ubuntu/.bun/bin/bun install --frozen-lockfile
+            /home/ubuntu/.bun/bin/bun install
 
             echo "Running DB migrations..."
             /home/ubuntu/.bun/bin/bun run db:push
