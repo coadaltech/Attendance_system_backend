@@ -73,12 +73,11 @@ function scheduleNightlyClose() {
   }, delay)
 }
 
-// Punch-in reminder: at 10:00 AM every day except Sunday, push-notify all active employees
-// TEMP (testing only): set to 5:15 PM — revert to setHours(10, 0, 0, 0) before real use
+// Punch-in reminder: at 10:00 AM every working day (Mon-Sat), push-notify all active employees
 function schedulePunchInReminder() {
   const now = new Date()
   const next = new Date()
-  next.setHours(17, 15, 0, 0)
+  next.setHours(10, 0, 0, 0)
   if (now >= next) next.setDate(next.getDate() + 1)
   const delay = next.getTime() - now.getTime()
 
