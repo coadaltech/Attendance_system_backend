@@ -25,7 +25,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             git clean -fd
-
+ 
             echo "Installing dependencies..."
             /home/ubuntu/.bun/bin/bun install
 
